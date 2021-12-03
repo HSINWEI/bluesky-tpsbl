@@ -1,0 +1,5 @@
+/dist/
+/tpsbl.egg-info/
+__pycache__/
+.project
+.pydevproject
