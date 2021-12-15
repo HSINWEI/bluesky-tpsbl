@@ -53,7 +53,7 @@ class EigerDetector(AreaDetector):
     images_per_set = Cpt(Signal, value=1, add_prefix=())
     number_of_sets = Cpt(Signal, value=1, add_prefix=())
 
-    pixel_size = Cpt(Signal, value=.0001, kind='config')
+    pixel_size = Cpt(Signal, value=.000075, kind='config')
     #testing DO
     detector_type = Cpt(Signal, value='Eiger', kind='config')
     stats1 = Cpt(StatsPlugin, 'Stats1:')
