@@ -9,6 +9,7 @@ setup(
               'tpsbl.databroker',
               'tpsbl.ophyd'],
     install_requires=[
+        'pyepics==3.4.3',
         'bluesky',
         'ophyd',
         'databroker',
@@ -29,5 +30,6 @@ setup(
         'pyepics',
         'lmfit',
         'pytest',
+        'more_itertools',
     ],
 )
