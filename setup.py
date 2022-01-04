@@ -23,7 +23,7 @@ setup(
         'PyQt5',
         'pydevd',
         'requests',
-        'bluesky-adaptive',
+        'bluesky-adaptive;python_version>="3.7"',
         'ipython',
         'pyzmq',
         'scikit-image',
