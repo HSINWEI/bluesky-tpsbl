@@ -31,9 +31,11 @@ class XYESerializer(CSVSerializer):
         # hint: md_args.extend([repr(motor), pos_list])
         if self._xye_prefix == None:
             mtr_sp_list = [f'seq_num-{{event[seq_num][0]:04d}}']
+            self.motor_name_list = []
             if 'args' in doc['plan_args'].keys():
                 for motorname in (doc['motors'][:-1] or doc['motors']):
                     mtr_sp_list.append(f"{motorname}-{{event[data][{motorname}_user_setpoint][0]:.2f}}")
+                    self.motor_name_list.append(motorname)
             self._xye_prefix = '-'.join(mtr_sp_list)
 
     def to_xye(self, doc):
@@ -41,6 +43,11 @@ class XYESerializer(CSVSerializer):
                            self.y_data_name:doc['data'][self.y_data_name][0].round(1)})
         df=df.set_index(self.x_data_name)
         df.index.name = self.x_data_name
+        # veryfy motor_sp name
+        for motorname in self.motor_name_list:
+            if f'{motorname}_setpoint' in doc['data']:
+                self._xye_prefix = self._xye_prefix.replace(f'{motorname}_user_setpoint', f'{motorname}_setpoint')
+
         _templated_xye_prefix = self._xye_prefix.format(event=doc)
         filename = (f'{self._templated_file_prefix}'
                     f"{_templated_xye_prefix}.xye")
