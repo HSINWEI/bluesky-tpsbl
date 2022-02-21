@@ -33,11 +33,7 @@ class XYESerializer(CSVSerializer):
             mtr_sp_list = [f'seq_num-{{event[seq_num][0]:04d}}']
             if 'args' in doc['plan_args'].keys():
                 for motorname in (doc['motors'][:-1] or doc['motors']):
-                    if f'{motorname}_user_setpoint' in doc['data']:
-                        motor_sp = doc['data'][f'{motorname}_user_setpoint'][0]
-                    else:
-                        motor_sp = doc['data'][f'{motorname}_setpoint'][0]
-                    mtr_sp_list.append(f"{motorname}-{motor_sp:.2f}")
+                    mtr_sp_list.append(f"{motorname}-{{event[data][{motorname}_user_setpoint][0]:.2f}}")
             self._xye_prefix = '-'.join(mtr_sp_list)
 
     def to_xye(self, doc):
