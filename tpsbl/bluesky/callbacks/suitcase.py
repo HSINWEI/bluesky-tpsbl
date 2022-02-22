@@ -19,11 +19,12 @@ class XYESerializer(CSVSerializer):
         ``{motor1-{event[data][motor1_setpoint]}-motor2-{event[data][motor2_setpoint]}``,
         The default value is extracted all motors except the innermost motor from RunStart document
     '''
-    def __init__(self, y_data_name, x_data_name, *args, xye_prefix=None, **kwargs):
+    def __init__(self, y_data_name, x_data_name, *args, xye_prefix=None, data_alias_name={},**kwargs):
         super().__init__(*args, **kwargs)
         self._xye_prefix = xye_prefix
         self.y_data_name = y_data_name
         self.x_data_name = x_data_name
+        self.data_alias_name = data_alias_name
 
     def start(self,doc):
         super().start(doc)
@@ -43,10 +44,18 @@ class XYESerializer(CSVSerializer):
                            self.y_data_name:doc['data'][self.y_data_name][0].round(1)})
         df=df.set_index(self.x_data_name)
         df.index.name = self.x_data_name
-        # veryfy motor_sp name
+
         for motorname in self.motor_name_list:
+            # veryfy motor_sp name
             if f'{motorname}_setpoint' in doc['data']:
                 self._xye_prefix = self._xye_prefix.replace(f'{motorname}_user_setpoint', f'{motorname}_setpoint')
+
+            # use data_alias_name if any
+            for motor_spname in [f'{motorname}_setpoint', f'{motorname}_user_setpoint']:
+                for spname_key in [f'{motorname}_setpoint', f'{motorname}_user_setpoint']:
+                    aliasname = self.data_alias_name.get(spname_key,None)
+                    if aliasname:
+                        self._xye_prefix = self._xye_prefix.replace(motor_spname, aliasname)
 
         _templated_xye_prefix = self._xye_prefix.format(event=doc)
         filename = (f'{self._templated_file_prefix}'
