@@ -90,6 +90,7 @@ class LiveCbsFactory:
                 fig = lef.result.plot()
                 fig.canvas.manager.window.setGeometry(640,805,640,601)
                 fig.canvas.set_window_title(f"Scan ID: {scan_id} {lef.__class__.__name__}")
+                print(lef.result.fit_report())
                 print(bec.peaks)
                 '''
                     move positioner
