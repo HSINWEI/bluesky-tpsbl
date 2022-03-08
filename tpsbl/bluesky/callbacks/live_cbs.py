@@ -83,11 +83,11 @@ class LiveCbsFactory:
             orig_stop = cb.stop
             def inner(self, doc):
                 orig_stop(doc)
-                fig, _ = lf.result.plot()
+                fig = lf.result.plot()
                 fig.canvas.manager.window.setGeometry(640,30,640,601)
                 fig.canvas.set_window_title(f"Scan ID: {scan_id}, {lf.__class__.__name__}")
                 print(lf.result.fit_report())
-                fig, _ = lef.result.plot()
+                fig = lef.result.plot()
                 fig.canvas.manager.window.setGeometry(640,805,640,601)
                 fig.canvas.set_window_title(f"Scan ID: {scan_id} {lef.__class__.__name__}")
                 print(bec.peaks)
