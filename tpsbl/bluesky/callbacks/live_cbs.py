@@ -3,6 +3,8 @@ from bluesky.callbacks.best_effort import BestEffortCallback
 from bluesky.callbacks.fitting import LiveFit
 from lmfit.models import GaussianModel
 from types import MethodType
+import pandas as pd
+
 
 class LiveEdgeFit(LiveFit):
     def start(self, doc):
@@ -29,7 +31,7 @@ class LiveEdgeFit(LiveFit):
 class LiveCbsFactory:
     def __init__(self, positioner=None, detector=None, choice=None,
                  x_data_name=None, y_data_name=None, update_every=None,
-                 live_table_enabled=False, fit_plots_enabled=True):
+                 live_table_enabled=False, fit_plots_enabled=True, verbose=False):  # @UnusedVariable
         '''
         a monkey patch for one dimensional scan
         to compute and move to desired position after scan
@@ -57,6 +59,7 @@ class LiveCbsFactory:
         self.update_every = update_every
         self.live_table_enabled = live_table_enabled
         self.fit_plots_enabled = fit_plots_enabled
+        self.verbose = verbose
 
     def __call__(self, name, doc):
         scan_id = doc['scan_id']
@@ -90,35 +93,42 @@ class LiveCbsFactory:
         def stop_decorator(cb):
             orig_stop = cb.stop
             fit_plots_enabled = self.fit_plots_enabled
+            verbose = self.verbose
             def inner(self, doc):
                 orig_stop(doc)
-                print(lef.result.fit_report())
-                print(lf.result.fit_report())
-                print(bec.peaks)
+
+                if verbose:
+                    print(f'== Gaussian fit ==\n {lf.result.fit_report()}\n')
+                    print(f'== Edge fit ==\n {lef.result.fit_report()}\n')
+                    print(f'== bec peaks ==\n {bec.peaks}\n')
+                '''
+                    collect top result of all methods
+                '''
+                top_res = dict(
+                    max = dict(pos=bec.peaks['max'][y][0], height=bec.peaks['max'][y][1], fwhm='-'),
+                    min = dict(pos=bec.peaks['min'][y][0], height=bec.peaks['min'][y][1], fwhm='-'),
+                    com = dict(pos=bec.peaks['com'][y], height='-', fwhm='-'),
+                    cen = dict(pos=bec.peaks['cen'][y], height='-', fwhm='-'),
+                    fit = dict(pos=lf.result.params['center'].value, height=lf.result.params['height'].value,
+                               fwhm=lf.result.params['fwhm'].value),
+                    edgefit = dict(pos=lef.result.params['center'].value, height=lef.result.params['height'].value,
+                                   fwhm=lef.result.params['fwhm'].value),
+                    )
+                with pd.option_context('display.float_format', '{:0.6f}'.format):
+                    df = pd.DataFrame().from_dict(top_res, orient='index')
+                    df.index.name = 'method'
+                    print(df, end='\n\n')
                 '''
                     move positioner
                 '''
-                if choice == 'peak':
-                    top = bec.peaks['max'][y][0]
-                elif choice == 'valley':
-                    top = bec.peaks['min'][y][0]
-                elif choice == 'com':
-                    top = bec.peaks['com'][y]
-                elif choice == 'cen':
-                    top = bec.peaks['cen'][y]
-                elif choice == 'fit':
-                    top = lf.result.params['center'].value
-                elif choice == 'edgefit':
-                    top = lef.result.params['center'].value
-                else:
-                    top = None
+                top = top_res.get(choice, {}).get('pos',None)
 
                 if (positioner is not None
                     and x in positioner.describe()
                     and top is not None):
                     print(f"{plan_name}: UID = {uid}, Scan ID:{scan_id}")
                     positioner.move(top)
-                    print(f"Found and moved to top at {top:.3} via method {choice}\n")
+                    print(f"Found and moved to top at {top:.3} via method {choice}\n", flush=True)
 
                 if fit_plots_enabled:
                     fig = lf.result.plot()
