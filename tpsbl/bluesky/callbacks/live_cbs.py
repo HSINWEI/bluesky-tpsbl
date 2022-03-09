@@ -123,11 +123,11 @@ class LiveCbsFactory:
                 if fit_plots_enabled:
                     fig = lf.result.plot()
                     fig.canvas.manager.window.setGeometry(640,30,640,601)
-                    fig.canvas.set_window_title(f"Scan ID: {scan_id}, {lf.__class__.__name__}")
+                    fig.canvas.manager.set_window_title(f"Scan ID: {scan_id}, {lf.__class__.__name__}")
 
                     fig = lef.result.plot()
                     fig.canvas.manager.window.setGeometry(640,805,640,601)
-                    fig.canvas.set_window_title(f"Scan ID: {scan_id} {lef.__class__.__name__}")
+                    fig.canvas.manager.set_window_title(f"Scan ID: {scan_id} {lef.__class__.__name__}")
 
             return MethodType(inner, cb)
         bec.stop = stop_decorator(bec)
