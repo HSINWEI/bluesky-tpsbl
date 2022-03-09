@@ -28,7 +28,8 @@ class LiveEdgeFit(LiveFit):
 
 class LiveCbsFactory:
     def __init__(self, positioner=None, detector=None, choice=None,
-                 x_data_name=None, y_data_name=None, update_every=None):
+                 x_data_name=None, y_data_name=None, update_every=None,
+                 live_table_enabled=False, fit_plots_enabled=True):
         '''
         a monkey patch for one dimensional scan
         to compute and move to desired position after scan
@@ -39,11 +40,13 @@ class LiveCbsFactory:
         :param x_data_name: override positioner.name if not None
         :param y_data_name: override detector.name if not None
         :param update_every: see LiveFit
+        :param live_table_enabled: set False if outside bec table is enabled
+        :param fit_plots_enabled: option to disable fit plots
 
         :example:
             rr = RunRouter([LiveCbsFactory(motor, noisy_det, 'peak', update_every=101)])
         :example:
-            RE(scan([noisy_det], motor, -5,5,101),
+            RunEngine()(scan([noisy_det], motor, -5,5,101),
                RunRouter([LiveCbsFactory(motor, noisy_det, 'peak', update_every=101)]))
         '''
         self.positioner = positioner
@@ -52,6 +55,8 @@ class LiveCbsFactory:
         self.x_data_name = x_data_name or (None if positioner is None else positioner.name)
         self.y_data_name = y_data_name or (None if detector is None else detector.name)
         self.update_every = update_every
+        self.live_table_enabled = live_table_enabled
+        self.fit_plots_enabled = fit_plots_enabled
 
     def __call__(self, name, doc):
         scan_id = doc['scan_id']
@@ -61,8 +66,11 @@ class LiveCbsFactory:
         x = self.x_data_name or doc.get('x_data_name')
         y = self.y_data_name or doc.get('y_data_name')
 
-        lt = LiveTable([y,x])
+        if self.live_table_enabled:
+            lt = LiveTable([y,x])
         bec = BestEffortCallback(table_enabled=False)
+        bec.disable_heading()
+        bec.disable_baseline()
         lf = LiveFit(GaussianModel(), y, {'x':x}, update_every=self.update_every or int(doc['num_points']/10))
         lef = LiveEdgeFit(GaussianModel(), y, {'x':x}, update_every=self.update_every or int(doc['num_points']/10))
 
@@ -81,39 +89,52 @@ class LiveCbsFactory:
 
         def stop_decorator(cb):
             orig_stop = cb.stop
+            fit_plots_enabled = self.fit_plots_enabled
             def inner(self, doc):
                 orig_stop(doc)
-                fig = lf.result.plot()
-                fig.canvas.manager.window.setGeometry(640,30,640,601)
-                fig.canvas.set_window_title(f"Scan ID: {scan_id}, {lf.__class__.__name__}")
-                print(lf.result.fit_report())
-                fig = lef.result.plot()
-                fig.canvas.manager.window.setGeometry(640,805,640,601)
-                fig.canvas.set_window_title(f"Scan ID: {scan_id} {lef.__class__.__name__}")
                 print(lef.result.fit_report())
+                print(lf.result.fit_report())
                 print(bec.peaks)
                 '''
                     move positioner
                 '''
+                if choice == 'peak':
+                    top = bec.peaks['max'][y][0]
+                elif choice == 'valley':
+                    top = bec.peaks['min'][y][0]
+                elif choice == 'com':
+                    top = bec.peaks['com'][y]
+                elif choice == 'cen':
+                    top = bec.peaks['cen'][y]
+                elif choice == 'fit':
+                    top = lf.result.params['center'].value
+                elif choice == 'edgefit':
+                    top = lef.result.params['center'].value
+                else:
+                    top = None
+
                 if (positioner is not None
-                    and x in positioner.describe()):
-                    if choice == 'peak':
-                        top = bec.peaks['max'][y][0]
-                    elif choice == 'valley':
-                        top = bec.peaks['min'][y][0]
-                    elif choice == 'com':
-                        top = bec.peaks['com'][y]
-                    elif choice == 'cen':
-                        top = bec.peaks['cen'][y]
-                    elif choice == 'fit':
-                        top = lf.result.params['center'].value
-                    elif choice == 'edgefit':
-                        top = lef.result.params['center'].value
+                    and x in positioner.describe()
+                    and top is not None):
                     print(f"{plan_name}: UID = {uid}, Scan ID:{scan_id}")
                     positioner.move(top)
                     print(f"Found and moved to top at {top:.3} via method {choice}\n")
+
+                if fit_plots_enabled:
+                    fig = lf.result.plot()
+                    fig.canvas.manager.window.setGeometry(640,30,640,601)
+                    fig.canvas.set_window_title(f"Scan ID: {scan_id}, {lf.__class__.__name__}")
+
+                    fig = lef.result.plot()
+                    fig.canvas.manager.window.setGeometry(640,805,640,601)
+                    fig.canvas.set_window_title(f"Scan ID: {scan_id} {lef.__class__.__name__}")
+
             return MethodType(inner, cb)
         bec.stop = stop_decorator(bec)
 
-        return [lt, lf, lef, bec], []
+        if self.live_table_enabled:
+            cbs = [lt, lf, lef, bec], []
+        else:
+            cbs = [lf, lef, bec], []
+        return cbs
 
