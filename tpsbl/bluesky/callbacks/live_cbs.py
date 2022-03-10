@@ -75,7 +75,6 @@ class LiveCbsFactory:
         bec = BestEffortCallback(table_enabled=False)
         bec.disable_heading()
         bec.disable_baseline()
-        bec.disable_plots()
         lf = LiveFit(GaussianModel(), y, {'x':x}, update_every=self.update_every or int(doc['num_points']/10))
         lef = LiveEdgeFit(GaussianModel(), y, {'x':x}, update_every=self.update_every or int(doc['num_points']/10))
 
