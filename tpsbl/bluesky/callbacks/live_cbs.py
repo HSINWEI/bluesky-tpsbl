@@ -72,7 +72,7 @@ class LiveCbsFactory:
 
         if self.live_table_enabled:
             lt = LiveTable([y,x])
-        bec = BestEffortCallback(table_enabled=False)
+        bec = BestEffortCallback(table_enabled=True)
         lf = LiveFit(GaussianModel(), y, {'x':x}, update_every=self.update_every or int(doc['num_points']/10))
         lef = LiveEdgeFit(GaussianModel(), y, {'x':x}, update_every=self.update_every or int(doc['num_points']/10))
 
