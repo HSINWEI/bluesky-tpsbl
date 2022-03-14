@@ -4,8 +4,6 @@ from bluesky.callbacks.fitting import LiveFit
 from lmfit.models import GaussianModel
 from types import MethodType
 import pandas as pd
-import lmfit
-import numpy as np
 
 class LiveEdgeFit(LiveFit):
     def start(self, doc):
@@ -32,7 +30,8 @@ class LiveEdgeFit(LiveFit):
 class LiveCbsFactory:
     def __init__(self, positioner=None, detector=None, choice=None,
                  x_data_name=None, y_data_name=None, update_every=None,
-                 live_table_enabled=False, fit_plots_enabled=True, verbose=False):  # @UnusedVariable
+                 bec=None,
+                 live_table_enabled=False, fit_plots_enabled=True, verbose=False):
         '''
         a monkey patch for one dimensional scan
         to compute and move to desired position after scan
@@ -43,14 +42,15 @@ class LiveCbsFactory:
         :param x_data_name: override positioner.name if not None
         :param y_data_name: override detector.name if not None
         :param update_every: see LiveFit
+        :param bec: BestEffortCallback used by RunEngine
         :param live_table_enabled: set False if outside bec table is enabled
         :param fit_plots_enabled: option to disable fit plots
 
         :example:
-            rr = RunRouter([LiveCbsFactory(motor, noisy_det, 'peak', update_every=101)])
+            rr = RunRouter([LiveCbsFactory(motor, noisy_det, 'method', bec=bec)])
         :example:
-            RunEngine()(scan([noisy_det], motor, -5,5,101),
-               RunRouter([LiveCbsFactory(motor, noisy_det, 'peak', update_every=101)]))
+            RE(scan([noisy_det], motor, -5,5,101),
+               RunRouter([LiveCbsFactory(motor, noisy_det, 'method',bec=bec)]))
         '''
         self.positioner = positioner
         self.detector = detector
@@ -58,11 +58,15 @@ class LiveCbsFactory:
         self.x_data_name = x_data_name or (None if positioner is None else positioner.name)
         self.y_data_name = y_data_name or (None if detector is None else detector.name)
         self.update_every = update_every
+        self.bec = bec
         self.live_table_enabled = live_table_enabled
         self.fit_plots_enabled = fit_plots_enabled
         self.verbose = verbose
 
     def __call__(self, name, doc):
+        '''
+            start doc
+        '''
         scan_id = doc['scan_id']
         uid = doc['uid']
         plan_name = doc['plan_name']
@@ -72,28 +76,19 @@ class LiveCbsFactory:
 
         if self.live_table_enabled:
             lt = LiveTable([y,x])
-        bec = BestEffortCallback(table_enabled=True)
         lf = LiveFit(GaussianModel(), y, {'x':x}, update_every=self.update_every or int(doc['num_points']/10))
         lef = LiveEdgeFit(GaussianModel(), y, {'x':x}, update_every=self.update_every or int(doc['num_points']/10))
 
         choice = self.choice or doc.get('choice','peak')
         positioner = self.positioner
 
-        def descriptor_decorator(cb):
-            orig_descriptor = cb.descriptor
-            def inner(self, doc):
-                orig_descriptor(doc)
-                if doc['name'] == 'primary':
-                    fig = list(bec._live_plots.values())[0][y].ax.figure
-                    fig.canvas.manager.window.setGeometry(0,30,640,601)
-            return MethodType(inner, cb)
-        bec.descriptor = descriptor_decorator(bec)
-
         def stop_decorator(cb):
-            orig_stop = cb.stop
+            orig_stop = cb.stop # push
             fit_plots_enabled = self.fit_plots_enabled
             verbose = self.verbose
+            bec = self.bec
             def inner(self, doc):
+                cb.stop = orig_stop #pop
                 orig_stop(doc)
 
                 if verbose:
@@ -138,12 +133,14 @@ class LiveCbsFactory:
                     fig.canvas.manager.window.setGeometry(640,805,640,601)
                     fig.canvas.manager.set_window_title(f"Scan ID: {scan_id} {lef.__class__.__name__}")
 
+
+
             return MethodType(inner, cb)
-        bec.stop = stop_decorator(bec)
+        self.bec.stop = stop_decorator(self.bec)
 
         if self.live_table_enabled:
-            cbs = [lt, lf, lef, bec], []
+            cbs = [lt, lf, lef], []
         else:
-            cbs = [lf, lef, bec], []
+            cbs = [lf, lef], []
         return cbs
 
